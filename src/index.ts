@@ -79,7 +79,7 @@ async function main() {
       return
     }
 
-    const body: string = event.event?.content?.body
+    const body: string = event.getContent().body
     if (!body) {
       return
     }
@@ -94,7 +94,7 @@ async function main() {
         '',
       )
     } else if (cmd === '!watch') {
-      const sender = room.getMember(event.sender.userId)
+      const sender = room.getMember(event.getSender())
       if (sender.powerLevel < 50) {
         return
       }
