@@ -9,6 +9,7 @@ import pkg from '../package.json'
 type View = {
   kind: 'hls' | 'embed'
   url: string
+  fill: boolean
 }
 
 type Config = {
@@ -106,6 +107,7 @@ async function main() {
         view = {
           kind: 'embed',
           url: parts[1],
+          fill: parts[2] === 'fill',
         }
       }
 
