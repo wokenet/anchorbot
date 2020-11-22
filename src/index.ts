@@ -104,8 +104,8 @@ async function main() {
       let view = alias.get(parts[1])
       if (!view) {
         view = {
-          kind: parts[1].toLowerCase(),
-          url: parts[2],
+          kind: 'embed',
+          url: parts[1],
         }
       }
 
