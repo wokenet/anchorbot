@@ -6,8 +6,8 @@ import TOML from '@iarna/toml'
 import sdk, { EventType } from 'matrix-js-sdk'
 import pkg from '../package.json'
 
-type Stream = {
-  kind: string
+type View = {
+  kind: 'hls' | 'embed'
   url: string
 }
 
@@ -16,8 +16,10 @@ type Config = {
   accessToken: string
   userId: string
   roomId: string
-  alias: Map<string, Stream>
+  alias: Map<string, View>
 }
+
+const AnchorViewEventType = 'net.woke.anchor.view' as EventType
 
 function readConfig(): Config {
   const argv = yargs(process.argv.slice(2))
@@ -55,7 +57,7 @@ function readConfig(): Config {
     'room-id': roomId,
   } = argv
 
-  const aliasConfig = argv.alias as { [name: string]: Stream }
+  const aliasConfig = argv.alias as { [name: string]: View }
   const alias = new Map(Object.entries(aliasConfig))
 
   return { baseUrl, accessToken, userId, roomId, alias }
@@ -93,21 +95,23 @@ async function main() {
         `🤖 ${pkg.name} v${pkg.version} (${pkg.homepage})`,
         '',
       )
-    } else if (cmd === '!watch') {
+    } else if (cmd === '!view') {
       const sender = room.getMember(event.getSender())
       if (sender.powerLevel < 50) {
         return
       }
 
-      let stream = alias.get(parts[1])
-      if (!stream) {
-        stream = { kind: parts[1], url: parts[2] }
+      let view = alias.get(parts[1])
+      if (!view) {
+        view = {
+          kind: parts[1].toLowerCase(),
+          url: parts[2],
+        }
       }
 
-      const eventType = 'net.woke.anchor' as EventType
-      client.sendStateEvent(room.roomId, eventType, stream, 'stream')
+      client.sendStateEvent(room.roomId, AnchorViewEventType, view, '')
 
-      client.sendTextMessage(roomId, `Switching to stream: ${stream.url}`, '')
+      client.sendTextMessage(roomId, `Switching to view: ${view.url}`, '')
     }
   })
 }
