@@ -7,6 +7,7 @@ import sdk, { EventType } from 'matrix-js-sdk'
 import pkg from '../package.json'
 
 type View = {
+  title?: string
   kind: 'hls' | 'embed'
   url: string
   fill: boolean
@@ -113,7 +114,11 @@ async function main() {
 
       client.sendStateEvent(room.roomId, AnchorViewEventType, view, '')
 
-      client.sendTextMessage(roomId, `Switching to view: ${view.url}`, '')
+      client.sendTextMessage(
+        roomId,
+        `Switching to view: ${view.title || view.url}`,
+        '',
+      )
     }
   })
 }
