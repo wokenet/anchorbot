@@ -8,7 +8,7 @@ import pkg from '../package.json'
 
 type View = {
   title?: string
-  kind: 'hls' | 'embed'
+  kind: 'hls' | 'embed' | 'offline'
   url: string
   fill: boolean
 }
@@ -17,7 +17,7 @@ type Config = {
   baseUrl: string
   accessToken: string
   userId: string
-  roomId: string
+  rooms: { anchor: string; announcements: string; curators: string }
   alias: Map<string, View>
 }
 
@@ -44,29 +44,34 @@ function readConfig(): Config {
       required: true,
       string: true,
     })
-    .group(['room-id'], 'Room')
-    .option('room-id', {
+    .group(['rooms.anchor', 'rooms.announcements', 'rooms.curators'], 'Rooms')
+    // FIXME: making these 'required' doesn't seem to work with getting the values via config()
+    .option('rooms.anchor', {
       describe: 'Anchor room id',
-      required: true,
+      string: true,
+    })
+    .option('rooms.announcements', {
+      describe: 'Announcement room id',
+      string: true,
+    })
+    .option('rooms.curators', {
+      describe: 'Curator room id',
       string: true,
     })
     .help().argv
 
-  const {
-    server: baseUrl,
-    token: accessToken,
-    'user-id': userId,
-    'room-id': roomId,
-  } = argv
+  const { server: baseUrl, token: accessToken, 'user-id': userId } = argv
 
   const aliasConfig = argv.alias as { [name: string]: View }
   const alias = new Map(Object.entries(aliasConfig))
 
-  return { baseUrl, accessToken, userId, roomId, alias }
+  const rooms = argv.rooms as Config['rooms']
+
+  return { baseUrl, accessToken, userId, rooms, alias }
 }
 
 async function main() {
-  const { baseUrl, accessToken, userId, roomId, alias } = readConfig()
+  const { baseUrl, accessToken, userId, rooms, alias } = readConfig()
   const client = sdk.createClient({
     baseUrl,
     userId,
@@ -75,8 +80,10 @@ async function main() {
 
   await client.startClient()
   await once(client, 'sync')
-  await client.joinRoom(roomId)
-  console.log(`Joined room ${roomId}`)
+  for (const roomId of Object.values(rooms)) {
+    await client.joinRoom(roomId)
+    console.log(`Joined room ${roomId}`)
+  }
 
   client.on('Room.timeline', function (event, room) {
     if (event.getType() !== 'm.room.message') {
@@ -89,36 +96,56 @@ async function main() {
     }
 
     const parts = body.split(' ')
-    const cmd = parts[0]
+    const cmd = parts.shift()
 
     if (cmd === '!bot') {
-      client.sendTextMessage(
-        roomId,
+      client.sendNotice(
+        event.getRoomId(),
         `🤖 ${pkg.name} v${pkg.version} (${pkg.homepage})`,
         '',
       )
-    } else if (cmd === '!view') {
-      const sender = room.getMember(event.getSender())
-      if (sender.powerLevel < 50) {
-        return
-      }
+      return
+    }
 
-      let view = alias.get(parts[1])
+    // Curator-only commands
+    if (room.roomId != rooms.curators) {
+      return
+    }
+
+    const sender = room.getMember(event.getSender())
+    if (sender.powerLevel < 50) {
+      return
+    }
+
+    if (cmd === '!view') {
+      let view = alias.get(parts[0])
       if (!view) {
         view = {
           kind: 'embed',
-          url: parts[1],
-          fill: parts[2] === 'fill',
+          url: parts[0],
+          fill: parts[1] === 'fill',
         }
       }
 
-      client.sendStateEvent(room.roomId, AnchorViewEventType, view, '')
-
-      client.sendTextMessage(
-        roomId,
-        `Switching to view: ${view.title || view.url}`,
+      client.sendStateEvent(rooms.anchor, AnchorViewEventType, view, '')
+      for (const roomId of [rooms.anchor, rooms.curators]) {
+        client.sendNotice(roomId, `Now viewing: ${view.title || view.url}`, '')
+      }
+    } else if (cmd === '!end') {
+      client.sendStateEvent(
+        rooms.anchor,
+        AnchorViewEventType,
+        { kind: 'offline' },
         '',
       )
+      for (const roomId of [rooms.anchor, rooms.curators]) {
+        client.sendNotice(roomId, `Broadcast ended.`, '')
+      }
+    } else if (cmd === '!announce') {
+      const announceText = parts.join(' ')
+      client.setRoomTopic(rooms.anchor, announceText)
+      client.sendNotice(rooms.announcements, announceText, '')
+      client.sendNotice(rooms.curators, `Announcement sent.`, '')
     }
   })
 }
