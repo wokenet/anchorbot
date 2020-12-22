@@ -138,9 +138,7 @@ async function main() {
         { kind: 'offline' },
         '',
       )
-      for (const roomId of [rooms.anchor, rooms.curators]) {
-        client.sendNotice(roomId, `Broadcast ended.`, '')
-      }
+      client.sendNotice(rooms.curators, `Broadcast ended.`, '')
     } else if (cmd === '!announce') {
       const announceText = parts.join(' ')
       client.setRoomTopic(rooms.anchor, announceText)
