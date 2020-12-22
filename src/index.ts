@@ -118,6 +118,15 @@ async function main() {
     }
 
     if (cmd === '!view') {
+      if (parts.length === 0) {
+        client.sendNotice(
+          event.getRoomId(),
+          'Please use !end to clear the view.',
+          '',
+        )
+        return
+      }
+
       let view = alias.get(parts[0])
       if (!view) {
         view = {
