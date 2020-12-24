@@ -117,7 +117,7 @@ async function main() {
       return
     }
 
-    if (cmd === '!view') {
+    if (cmd === '!view' || cmd === '!v') {
       if (parts.length === 0) {
         client.sendNotice(
           event.getRoomId(),
@@ -140,7 +140,7 @@ async function main() {
       for (const roomId of [rooms.anchor, rooms.curators]) {
         client.sendNotice(roomId, `Now viewing: ${view.title || view.url}`, '')
       }
-    } else if (cmd === '!end') {
+    } else if (cmd === '!end' || cmd === '!e') {
       client.sendStateEvent(
         rooms.anchor,
         AnchorViewEventType,
@@ -148,7 +148,7 @@ async function main() {
         '',
       )
       client.sendNotice(rooms.curators, `Broadcast ended.`, '')
-    } else if (cmd === '!announce') {
+    } else if (cmd === '!announce' || cmd === '!a') {
       const announceText = parts.join(' ')
       client.setRoomTopic(rooms.anchor, announceText)
       client.sendNotice(rooms.announcements, announceText, '')
