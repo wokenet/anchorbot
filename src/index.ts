@@ -112,11 +112,6 @@ async function main() {
       return
     }
 
-    const sender = room.getMember(event.getSender())
-    if (sender.powerLevel < 50) {
-      return
-    }
-
     if (cmd === '!view' || cmd === '!v') {
       if (parts.length === 0) {
         client.sendNotice(
