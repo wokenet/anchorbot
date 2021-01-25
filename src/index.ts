@@ -150,8 +150,9 @@ async function main() {
         console.warn('Failed to fetch streamers:', err)
         return
       }
+      const matchKey = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
       const streamer = streamers.find(
-        (s) => s.slug === kebabCase(parts[0].toLowerCase()),
+        (s) => matchKey(s.slug) === matchKey(parts[0]),
       )
       if (streamer) {
         client.sendMessage(
