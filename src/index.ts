@@ -2,7 +2,9 @@
 import fs from 'fs'
 import { once } from 'events'
 import yargs from 'yargs'
+import { kebabCase } from 'lodash'
 import TOML from '@iarna/toml'
+import fetch from 'node-fetch'
 import sdk, { EventType } from 'matrix-js-sdk'
 import pkg from '../package.json'
 
@@ -24,6 +26,8 @@ type Config = {
   baseUrl: string
   accessToken: string
   userId: string
+  anchorUrl: string
+  apiUrl: string
   rooms: { anchor: string; announcements: string; curators: string }
   alias: Map<string, View>
 }
@@ -35,7 +39,7 @@ function readConfig(): Config {
     .config('config', 'Path to TOML config file', (configPath: string) => {
       return TOML.parse(fs.readFileSync(configPath, 'utf-8'))
     })
-    .group(['server', 'user-id', 'token'], 'Connection')
+    .group(['server', 'user-id', 'token'], 'Matrix Connection')
     .option('server', {
       describe: 'Server URL',
       required: true,
@@ -50,6 +54,17 @@ function readConfig(): Config {
       describe: 'Access token',
       required: true,
       string: true,
+    })
+    .group(['anchor-server', 'api-server'], 'Base URLs')
+    .option('anchor-server', {
+      describe: 'WOKE Website Base URL',
+      string: true,
+      default: 'https://woke.net',
+    })
+    .option('api-server', {
+      describe: 'WOKE API Server URL',
+      string: true,
+      default: 'https://api.woke.net',
     })
     .group(['rooms.anchor', 'rooms.announcements', 'rooms.curators'], 'Rooms')
     // FIXME: making these 'required' doesn't seem to work with getting the values via config()
@@ -67,18 +82,32 @@ function readConfig(): Config {
     })
     .help().argv
 
-  const { server: baseUrl, token: accessToken, 'user-id': userId } = argv
+  const {
+    server: baseUrl,
+    token: accessToken,
+    'user-id': userId,
+    'anchor-server': anchorUrl,
+    'api-server': apiUrl,
+  } = argv
 
   const aliasConfig = argv.alias as { [name: string]: View }
   const alias = new Map(Object.entries(aliasConfig))
 
   const rooms = argv.rooms as Config['rooms']
 
-  return { baseUrl, accessToken, userId, rooms, alias }
+  return { baseUrl, accessToken, userId, anchorUrl, apiUrl, rooms, alias }
 }
 
 async function main() {
-  const { baseUrl, accessToken, userId, rooms, alias } = readConfig()
+  const {
+    baseUrl,
+    accessToken,
+    userId,
+    anchorUrl,
+    apiUrl,
+    rooms,
+    alias,
+  } = readConfig()
   const client = sdk.createClient({
     baseUrl,
     userId,
@@ -92,7 +121,7 @@ async function main() {
     console.log(`Joined room ${roomId}`)
   }
 
-  client.on('Room.timeline', function (event, room) {
+  client.on('Room.timeline', async function (event, room) {
     if (event.getType() !== 'm.room.message') {
       return
     }
@@ -111,6 +140,31 @@ async function main() {
         `🤖 ${pkg.name} v${pkg.version} (${pkg.homepage})`,
         '',
       )
+      return
+    } else if (cmd === '!streamer' && parts[0]) {
+      let streamers: Array<{ slug: string; name: string }>
+      try {
+        const resp = await fetch(`${apiUrl}/streamers/index.json`)
+        streamers = await resp.json()
+      } catch (err) {
+        console.warn('Failed to fetch streamers:', err)
+        return
+      }
+      const streamer = streamers.find(
+        (s) => s.slug === kebabCase(parts[0].toLowerCase()),
+      )
+      if (streamer) {
+        client.sendMessage(
+          rooms.anchor,
+          {
+            msgtype: 'm.notice',
+            body: `${streamer.name}: ${anchorUrl}/streamers/${streamer.slug}`,
+            format: 'net.woke.streamer',
+            'net.woke.streamer': streamer,
+          },
+          '',
+        )
+      }
       return
     }
 
