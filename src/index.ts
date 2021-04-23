@@ -196,7 +196,7 @@ async function main() {
       client.sendStateEvent(rooms.anchor, AnchorViewEventType, view, '')
       const viewTitle = view.title || ('url' in view ? view.url : 'unknown')
       for (const roomId of [rooms.anchor, rooms.curators]) {
-        client.sendNotice(roomId, `Now viewing: ${viewTitle}`, '')
+        client.sendNotice(roomId, `<Now viewing: ${viewTitle}>`, '')
       }
     } else if (cmd === '!end' || cmd === '!e') {
       client.sendStateEvent(
